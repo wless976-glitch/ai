@@ -1,0 +1,53 @@
+/* 3D дэвсгэрүүдийн хөдөлгөөн (хөвөгч картууд, тор шал, AI бичиж буй цэгүүд) */
+.float-3d {
+  transform: translate3d(0, 0, var(--z, 0px));
+  animation: float-3d 6s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes float-3d {
+  0%,
+  100% {
+    transform: translate3d(0, 0, var(--z, 0px));
+  }
+  50% {
+    transform: translate3d(0, -12px, var(--z, 0px));
+  }
+}
+
+.grid-floor {
+  background-image:
+    linear-gradient(to right, rgb(23 129 115 / 0.24) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(23 129 115 / 0.24) 1px, transparent 1px);
+  background-size: 56px 56px;
+  animation: grid-scroll 2.8s linear infinite;
+}
+
+@keyframes grid-scroll {
+  to {
+    background-position: 0 56px;
+  }
+}
+
+.typing-dot {
+  animation: typing 1.2s ease-in-out infinite;
+}
+
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-3d,
+  .grid-floor,
+  .typing-dot {
+    animation: none;
+  }
+}

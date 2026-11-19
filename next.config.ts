@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   reactCompiler: true,
+  // Тусдаа нүүр хуудас байхгүй — сайтыг нээхэд шууд "AI-аас асуух" чат руу орно
+  async redirects() {
+    return [{ source: "/", destination: "/dashboard/ask", permanent: false }];
+  },
   turbopack: {
     rules: {
       "*.css": {
