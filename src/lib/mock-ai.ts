@@ -3,7 +3,8 @@
  * HF_TOKEN тохируулаагүй эсвэл AI алдаа гарсан үед нөөц (fallback) болж ажиллана.
  * Бодит AI дуудлага: ai-client.ts → /api/ai/* → hf.ts
  */
-import { addDays, TODAY, weekday } from "./format";
+import { addDays, weekday } from "./format";
+import { getToday } from "./today";
 import type { BusinessProfile, Length, Platform, Post, PostFormat, PostStatus, PostVisual, Tone, VideoScene } from "./types";
 
 export interface GenerateInput {
@@ -38,7 +39,7 @@ const OPENERS: Record<Tone, string[]> = {
 const CTAS: Record<Tone, string> = {
   friendly: "💬 Асуух зүйл байвал мессеж бичээрэй!",
   professional: "Дэлгэрэнгүй мэдээллийг мессежээр авна уу.",
-  fun: "👉 Найзаа тэмдэглээд хамт ирээрэй!",
+  fun: "👉 Мессеж бичээд захиалаарай!",
   inspiring: "Бид таныг хүлээж байна 💛",
 };
 
@@ -57,9 +58,9 @@ function buildVideoCaption(input: GenerateInput, angleIndex: number) {
   const { topic, tone, business } = input;
   const t = topic.trim();
   const middle = [
-    `${business.name} дээр ирээд өөрөө мэдрээрэй.`,
-    `Бидний баг өдөр бүр үүнийг таны төлөө хийдэг.`,
-    `Хадгалаад авч, найздаа илгээгээрэй.`,
+    business.name ? `${business.name} дээр ирээд өөрөө мэдрээрэй.` : "Ирээд өөрөө мэдрээрэй.",
+    "Сонирхож байвал мессеж бичээрэй.",
+    "Хадгалаад аваарай — дараа хэрэг болно.",
   ][angleIndex];
   const caption = [VIDEO_HOOKS[angleIndex](t), middle, CTAS[tone]].join("\n\n");
   return input.useEmoji ? caption : stripEmoji(caption);
@@ -68,7 +69,7 @@ function buildVideoCaption(input: GenerateInput, angleIndex: number) {
 /** 15 секундын 4 хэсэгтэй зураг авалтын төлөвлөгөө */
 function buildScript(input: GenerateInput, angleIndex: number): VideoScene[] {
   const t = input.topic.trim();
-  const name = input.business.name;
+  const name = input.business.name || "Таны бизнес";
   const second: VideoScene[] = [
     { time: "3–8 сек", shot: `${t} — ойроос, гараар барьж эргүүлж харуулна`, text: "Яг одоо бэлэн" },
     { time: "3–8 сек", shot: "Бэлтгэл, хийц — гар, багаж, процесс ойроос", text: "Ингэж бэлтгэдэг" },
@@ -145,16 +146,16 @@ function buildCaption(input: GenerateInput, angleIndex: number) {
   const t = topic.trim();
 
   // Нэрийн араас тийн ялгал (-д, -ийн) залгавал ихэнхдээ буруу болдог тул "дээр" гэх мэт сул үг ашиглана
+  // Загвар нь бизнесийн тухай баримт (хугацаа, ажлын цаг, хямдрал) зохиохгүй — зөвхөн өгсөн мэдээллийг ашиглана
   const bodies = [
-    `${t} — ${business.name} дээр ирээд өөрөө мэдрээрэй. Бид таныг хүлээж байна!`,
-    `🎁 ${t}! Зөвхөн энэ 7 хоногт. Найзаа дагуулаад ирвэл бүр ч хөгжилтэй.`,
-    `Энэ удаагийн сэдэв: ${t}. Бидний баг үүн дээр олон хоног ажилласан. Таны сэтгэгдэл бидэнд хамгийн чухал 💬`,
+    `${t} — ${business.name ? `${business.name} дээр ирээд` : "ирээд"} өөрөө мэдрээрэй. Бид таныг хүлээж байна!`,
+    `🎁 ${t}! Дэлгэрэнгүйг мессежээр асуугаарай.`,
+    `Энэ удаагийн сэдэв: ${t}. Та үүнийг туршиж үзсэн үү? Сэтгэгдлээ үлдээгээрэй 💬`,
   ];
-  const extra = `📍 ${business.location}\n⏰ Өдөр бүр 08:00–21:00`;
 
   const parts = [opener, bodies[angleIndex]];
   if (length !== "short") parts.push(cta);
-  if (length === "long") parts.push(extra);
+  if (length === "long" && business.location) parts.push(`📍 ${business.location}`);
 
   const caption = parts.join("\n\n");
   return input.useEmoji ? caption : stripEmoji(caption);
@@ -195,7 +196,7 @@ const WEEK_TOPICS = [
   "Шинэ бүтээгдэхүүн танилцуулга",
   "Асуулт: Та алинд нь дуртай вэ?",
 ];
-/** Ухаалаг цаг: дагагчдын идэвхтэй үеүд (Үр дүн → идэвхийн дулааны зураг) */
+/** "Ухаалаг цаг" асаалттай үеийн анхдагч цагууд — дагагчдын бодит статистик холбогдоогүй тул тогтмол */
 const WEEK_TIMES = ["12:00", "18:00", "08:30", "19:00", "12:30", "18:00", "10:00"];
 const PLAIN_TIME = "12:00";
 
@@ -211,8 +212,9 @@ export async function generateWeekPlan(
 ): Promise<Post[]> {
   await sleep(1800);
   // Ирэх Даваа гарагаас эхлэнэ
-  const daysToMonday = (8 - weekday(TODAY)) % 7 || 7;
-  const monday = addDays(TODAY, daysToMonday);
+  const today = getToday();
+  const daysToMonday = (8 - weekday(today)) % 7 || 7;
+  const monday = addDays(today, daysToMonday);
   const step = 7 / count;
   return Array.from({ length: count }, (_, i) => {
     const topic = WEEK_TOPICS[i % WEEK_TOPICS.length];

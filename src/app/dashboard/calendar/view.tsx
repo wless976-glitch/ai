@@ -16,11 +16,11 @@ import {
   monthLabel,
   parseDate,
   toDateStr,
-  TODAY,
   WEEKDAYS_MON_FIRST,
   weekday,
 } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useToday } from "@/lib/today";
 import type { Post, PostStatus } from "@/lib/types";
 
 const CHIP: Record<PostStatus, string> = {
@@ -38,8 +38,11 @@ const DOT: Record<PostStatus, string> = {
 
 export function CalendarView() {
   const { posts, business, updatePost, notify } = useStore();
-  const today = parseDate(TODAY);
-  const [ym, setYm] = useState({ y: today.y, m: today.m });
+  const todayStr = useToday();
+  const today = parseDate(todayStr);
+  // Хэрэглэгч сар солих хүртэл өнөөдрийн сар (бодит огноо ачаалагдмагц шинэчлэгдэнэ)
+  const [ymDraft, setYm] = useState<{ y: number; m: number } | null>(null);
+  const ym = ymDraft ?? { y: today.y, m: today.m };
   const [openId, setOpenId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
 
@@ -60,7 +63,8 @@ export function CalendarView() {
   const monthPosts = visible.filter((p) => p.date.startsWith(monthPrefix)).sort(byDateTime);
 
   function shift(delta: number) {
-    setYm(({ y, m }) => {
+    setYm((prev) => {
+      const { y, m } = prev ?? { y: today.y, m: today.m };
       const nm = m + delta;
       if (nm < 1) return { y: y - 1, m: 12 };
       if (nm > 12) return { y: y + 1, m: 1 };
@@ -97,7 +101,7 @@ export function CalendarView() {
               <IconChevronRight className="size-4" />
             </Button>
             {(ym.y !== today.y || ym.m !== today.m) && (
-              <Button variant="secondary" size="sm" className="ml-1" onClick={() => setYm({ y: today.y, m: today.m })}>
+              <Button variant="secondary" size="sm" className="ml-1" onClick={() => setYm(null)}>
                 Өнөөдөр
               </Button>
             )}
@@ -121,14 +125,14 @@ export function CalendarView() {
           <div className="grid grid-cols-7">
             {cells.map((date, i) => {
               const dayPosts = date ? visible.filter((p) => p.date === date).sort(byDateTime) : [];
-              const isToday = date === TODAY;
+              const isToday = date === todayStr;
               return (
                 <div
                   key={date ?? `empty-${i}`}
                   className={cn(
                     "min-h-28 border-b border-r border-zinc-100 p-1.5 [&:nth-child(7n)]:border-r-0",
                     !date && "bg-zinc-50/50",
-                    date && date < TODAY && "bg-zinc-50/30",
+                    date && date < todayStr && "bg-zinc-50/30",
                   )}
                 >
                   {date && (
@@ -181,7 +185,7 @@ export function CalendarView() {
                   <p
                     className={cn(
                       "text-lg font-semibold leading-tight",
-                      p.date === TODAY ? "text-brand-600" : "text-zinc-900",
+                      p.date === todayStr ? "text-brand-600" : "text-zinc-900",
                     )}
                   >
                     {parseDate(p.date).d}
@@ -206,7 +210,7 @@ export function CalendarView() {
           open
           onClose={() => setOpenId(null)}
           title={open.topic}
-          description={`${formatDate(open.date)} · ${open.time}`}
+          description={`${formatDate(open.date, todayStr)} · ${open.time}`}
           size="lg"
           footer={
             <>

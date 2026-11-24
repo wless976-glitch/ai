@@ -16,10 +16,9 @@ import {
   Toggle,
   cn,
 } from "@/components/ui";
-import { AI_ISSUE_LABELS, AI_TASK_ORDER, AI_TASKS, AI_USAGE_LABELS, USES_OLLAMA, type AiUsage } from "@/lib/ai-models";
+import { AI_ISSUE_LABELS, AI_TASK_ORDER, AI_TASKS, AI_USAGE_LABELS, AI_USAGE_OPTIONS, USES_OLLAMA } from "@/lib/ai-models";
 import { setAiUsage, useAiUsage } from "@/lib/ai-usage";
-import { formatMoney, formatNumber } from "@/lib/format";
-import { FOLLOWERS } from "@/lib/mock-data";
+import { formatMoney } from "@/lib/format";
 import { MONTHLY_POSTS, PLAN_LABELS, PLUS_PRICE, WEEKLY_POSTS, type Plan } from "@/lib/plan";
 import { useStore } from "@/lib/store";
 import { usePlan } from "@/lib/use-plan";
@@ -208,7 +207,7 @@ export function SettingsView() {
               </SettingRow>
               <SettingRow
                 title="Ухаалаг цаг"
-                description="Таны дагагчид хамгийн идэвхтэй байх цагт автоматаар хуваарьлана."
+                description="Постуудыг өдрийн өөр өөр цагт тараан хуваарьлана. Дагагчдын бодит идэвхтэй цагийг Meta-тай холбогдсоны дараа ашиглах боломжтой болно."
                 checked={settings.smartTiming}
                 onChange={(v) => setSettings({ ...settings, smartTiming: v })}
               />
@@ -261,7 +260,7 @@ export function SettingsView() {
                       setAiUsage(v);
                       notify(`AI хэрэглээ: ${AI_USAGE_LABELS[v].label}`, "info");
                     }}
-                    options={(["mock", "lite", "full"] as AiUsage[]).map((u) => ({ value: u, label: AI_USAGE_LABELS[u].label }))}
+                    options={AI_USAGE_OPTIONS.map((u) => ({ value: u, label: AI_USAGE_LABELS[u].label }))}
                     className="shrink-0"
                   />
                 </div>
@@ -404,7 +403,7 @@ export function SettingsView() {
                     </p>
                     <p className="truncate text-xs text-zinc-500">
                       {connections[p]
-                        ? `${p === "facebook" ? business.name : "@" + business.handle} · ${formatNumber(FOLLOWERS[p])} дагагч`
+                        ? (p === "facebook" ? business.name : business.handle && "@" + business.handle) || "Холбогдсон (тест)"
                         : "Холбогдоогүй"}
                     </p>
                   </div>

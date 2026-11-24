@@ -1,10 +1,6 @@
 import type { PostStats } from "./types";
 
-/**
- * Тест горимд "өнөөдөр"-ийг тогтмол болгосон. Бодит хувилбарт серверийн огноо ашиглана.
- * (Prerender үед new Date() дуудахгүй байх нь Cache Components-д бас тохиромжтой.)
- */
-export const TODAY = "2026-11-16";
+/* "Өнөөдөр"-ийн бодит огноог today.ts-ийн useToday() / getToday()-аас авна. */
 
 export const WEEKDAYS_FULL = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
 export const WEEKDAYS_SHORT = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"];
@@ -40,10 +36,11 @@ export function monthLabel(y: number, m: number) {
   return `${y} оны ${m}-р сар`;
 }
 
-export function formatDate(s: string) {
-  if (s === TODAY) return "Өнөөдөр";
-  if (s === addDays(TODAY, 1)) return "Маргааш";
-  if (s === addDays(TODAY, -1)) return "Өчигдөр";
+/** today — useToday()-аас (Өнөөдөр, Маргааш, Өчигдөр гэж харуулахад) */
+export function formatDate(s: string, today: string) {
+  if (s === today) return "Өнөөдөр";
+  if (s === addDays(today, 1)) return "Маргааш";
+  if (s === addDays(today, -1)) return "Өчигдөр";
   const { m, d } = parseDate(s);
   return `${m}-р сарын ${d}, ${WEEKDAYS_FULL[weekday(s)]}`;
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkQuota } from "@/lib/plan-server";
+import { POST_WRITING_RULES } from "@/lib/academy/knowledge";
 import { AiError, chat, errorResponse, guard, limitsFor, NO_INVENTED_FACTS, requireText } from "@/lib/hf";
 import { LENGTH_LABELS, PLATFORM_LABELS, TONE_LABELS, type Length, type Platform, type Tone } from "@/lib/types";
 
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
       [
         {
           role: "system",
-          content: `Чи Монголын жижиг бизнесүүдэд зориулсан туршлагатай SMM мэргэжилтэн. Зөвхөн монгол хэлээр, кирилл үсгээр, байгалийн, ярианы хэллэгээр бичнэ. ${NO_INVENTED_FACTS} Хариултаа ЗӨВХӨН JSON хэлбэрээр өгнө, өөр тайлбар бүү нэм.`,
+          content: `Чи Монголын жижиг бизнесүүдэд зориулсан туршлагатай SMM мэргэжилтэн. Зөвхөн монгол хэлээр, кирилл үсгээр, байгалийн, ярианы хэллэгээр бичнэ. ${POST_WRITING_RULES} ${NO_INVENTED_FACTS} Хариултаа ЗӨВХӨН JSON хэлбэрээр өгнө, өөр тайлбар бүү нэм.`,
         },
         {
           role: "user",

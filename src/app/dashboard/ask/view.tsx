@@ -5,6 +5,7 @@ import { type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode, u
 import { AiConnectNotice } from "@/components/ai-connect-notice";
 import {
   IconAlert,
+  IconBook,
   IconCalendar,
   IconChart,
   IconClock,
@@ -15,6 +16,7 @@ import {
   IconRefresh,
   IconRocket,
   IconSend,
+  IconWallet,
 } from "@/components/icons";
 import { LogoMark } from "@/components/logo";
 import { Button, ButtonLink, cn, MonoLabel } from "@/components/ui";
@@ -25,6 +27,7 @@ import {
   newChat,
   newMessageId,
   setChatMessages,
+  takeAskPrefill,
   useChatMessages,
   useCurrentChatId,
 } from "@/lib/ask-history";
@@ -35,9 +38,11 @@ const SUGGESTIONS = [
   { icon: IconCalendar, text: "Энэ 7 хоногт ямар пост оруулбал дээр вэ?" },
   { icon: IconRocket, text: "Boost хийхэд хэдэн төгрөг зарцуулах нь зөв бэ?" },
   { icon: IconClock, text: "Instagram-д хэдэн цагт пост оруулбал илүү олон хүнд хүрэх вэ?" },
+  { icon: IconWallet, text: "Хувиараа бизнес эрхэлдэг бол татвараа яаж төлөх вэ? 2027 онд юу өөрчлөгдөх вэ?" },
   { icon: IconPencil, text: "Шинэ бүтээгдэхүүний тухай постын текст бичээд өгөөч" },
   { icon: IconMessage, text: "Муу сэтгэгдэлд хэрхэн эелдэг хариулах вэ?" },
   { icon: IconChart, text: "Хүрэлт, идэвх хоёрын ялгаа юу вэ? Аль нь илүү чухал вэ?" },
+  { icon: IconBook, text: "Нэг захиалгын ашиг ₮25,000 бол boost-д өдөрт хэдэн төгрөг зарцуулах вэ?" },
 ];
 
 const COMPOSER_MAX_PX = 200;
@@ -79,6 +84,18 @@ export function AskView({ chatId }: { chatId: string }) {
     };
   }, [locked]);
 
+  // Өөр хуудаснаас (Сургалт г.м.) бэлдэж өгсөн асуултыг талбарт тавина — автоматаар илгээхгүй
+  useEffect(() => {
+    const text = takeAskPrefill();
+    if (!text) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage-оос нэг удаа уншина (SSR-д байхгүй)
+    setDraft(text);
+    requestAnimationFrame(() => {
+      resizeInput(inputRef.current);
+      inputRef.current?.focus();
+    });
+  }, []);
+
   // Шинэ мессеж, хүлээлт, алдаа гарах бүрт доош гүйлгэнэ
   useEffect(() => {
     if (messages.length === 0 && !pending) return;
@@ -97,13 +114,16 @@ export function AskView({ chatId }: { chatId: string }) {
     setError(null);
     setLimitHit(false);
     try {
-      const { text: answer, remaining } = await askAI(
+      const { text: answer, remaining, sources } = await askAI(
         history.map(({ role, content }) => ({ role, content })),
         business,
       );
       if (epoch.current !== mine) return;
       // Хэрэглэгч өөр яриа руу шилжсэн ч хариулт өөрийн ярианд хадгалагдана
-      setChatMessages(chatId, [...history, { id: newMessageId(), role: "assistant", content: answer }]);
+      setChatMessages(chatId, [
+        ...history,
+        { id: newMessageId(), role: "assistant", content: answer, ...(sources.length ? { sources } : {}) },
+      ]);
       setLeft(remaining);
     } catch (err) {
       if (epoch.current !== mine) return;
@@ -184,8 +204,14 @@ export function AskView({ chatId }: { chatId: string }) {
             Юу асуух вэ?
           </h1>
           <p className="mt-2 max-w-md text-pretty text-[15px] text-zinc-500">
-            Пост, boost, үр дүн — сошиал маркетингийн талаар юу ч асуугаарай.{" "}
-            {business.name && <span className="text-zinc-700">{business.name}</span>}-д тохируулж хариулна.
+            Пост, boost, борлуулалт, татвар — бизнесийнхээ талаар юу ч асуугаарай. Сургалтын хичээлүүд дээр тулгуурлан
+            {business.name && (
+              <>
+                {" "}
+                <span className="text-zinc-700">{business.name}</span>-д тохируулж
+              </>
+            )}{" "}
+            хариулна.
           </p>
           <div className="mt-8 grid w-full grid-cols-1 gap-2 text-left sm:grid-cols-2">
             {SUGGESTIONS.map(({ icon: Icon, text }) => (
@@ -228,6 +254,21 @@ export function AskView({ chatId }: { chatId: string }) {
                   <Avatar />
                   <div className="min-w-0 flex-1 pt-1">
                     <RichText text={m.content} />
+                    {m.sources && m.sources.length > 0 && (
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                        <MonoLabel className="mr-0.5 text-[10px] text-zinc-400">Сургалтаас</MonoLabel>
+                        {m.sources.map((s) => (
+                          <Link
+                            key={s.href}
+                            href={`/dashboard/guides${s.href}`}
+                            title={s.module}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-[12px] font-medium text-brand-700 ring-1 ring-inset ring-brand-200/70 transition hover:bg-brand-100"
+                          >
+                            <IconBook className="size-3.5" /> {s.title}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                     <div className="mt-2 flex gap-1 text-zinc-400">
                       <Button variant="ghost" size="sm" className="h-7 px-2.5 text-[12px]" onClick={() => copy(m.content)}>
                         <IconCopy className="size-3.5" /> Хуулах

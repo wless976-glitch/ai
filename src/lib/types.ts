@@ -107,22 +107,3 @@ export interface AutomationSettings {
   weeklyReport: boolean;
 }
 
-export interface Guide {
-  id: string;
-  category: GuideCategory;
-  title: string;
-  minutes: number;
-  summary: string;
-  steps: string[];
-  tip?: string;
-}
-
-export type GuideCategory = "start" | "facebook" | "instagram" | "content" | "boost";
-
-export const GUIDE_CATEGORY_LABELS: Record<GuideCategory, string> = {
-  start: "Эхлэх",
-  facebook: "Facebook",
-  instagram: "Instagram",
-  content: "Контент",
-  boost: "Boost & Статистик",
-};

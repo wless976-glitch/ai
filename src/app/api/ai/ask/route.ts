@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { knowledgePrompt, searchKnowledge, toSources } from "@/lib/academy/knowledge";
 import { checkQuota } from "@/lib/plan-server";
 import { AiError, chat, errorResponse, guard, limitsFor, NO_INVENTED_FACTS, requireText } from "@/lib/hf";
 
@@ -45,17 +46,25 @@ export async function POST(req: Request) {
       .map(([k, v]) => `${k}: ${v}`)
       .join("\n");
 
-    const system = `Чи "Түгээ" апп доторх AI туслах. Монголын жижиг, дунд бизнесүүдэд (ЖДҮ) Facebook, Instagram маркетинг, пост бичих, boost хийх, үр дүнгээ ойлгох талаар зөвлөнө.${
+    // Сургалтаас хамааралтай хичээлүүд — сүүлийн 2 асуултаар хайна ("тэгвэл 2027 онд?" гэх мэт үргэлжлэлд)
+    const query = history
+      .filter((m) => m.role === "user")
+      .slice(-2)
+      .map((m) => m.content)
+      .join("\n");
+    const hits = searchKnowledge(query, { limit: limits.knowledgeHits, maxChars: limits.knowledgeChars });
+
+    const system = `Чи "Түгээ" апп доторх AI туслах. Монголын жижиг, дунд бизнесүүдэд (ЖДҮ) Facebook, Instagram маркетинг, пост бичих, boost хийх, үр дүнгээ ойлгох, борлуулалт, бизнесийн суурь тооцоо, татвар, хуулийн ерөнхий ойлголтын талаар зөвлөнө.${
       context ? `\n\nХэрэглэгчийн бизнес:\n${context}` : ""
     }
 
-Зөвхөн монгол хэлээр, кирилл үсгээр, ойлгомжтой, практик хариул. Товч бай — ихэвчлэн 3–8 өгүүлбэр эсвэл богино жагсаалт. Жагсаалтыг "- " эсвэл "1. "-ээр эхлүүл, чухал үгийг **тод** болгож болно. Markdown толгой (#), хүснэгт бүү ашигла. ${NO_INVENTED_FACTS} Мэдэхгүй, шалгах боломжгүй зүйлээ шууд хэл.`;
+Зөвхөн монгол хэлээр, кирилл үсгээр, ойлгомжтой, практик хариул. Хэрэглэгч латин үсгээр бичсэн ч кириллээр хариул. Товч бай — ихэвчлэн 3–8 өгүүлбэр эсвэл богино жагсаалт. Жагсаалтыг "- " эсвэл "1. "-ээр эхлүүл, чухал үгийг **тод** болгож болно. Markdown толгой (#), хүснэгт бүү ашигла. ${NO_INVENTED_FACTS} Мэдэхгүй, шалгах боломжгүй зүйлээ шууд хэл.${knowledgePrompt(hits)}`;
 
     // Үнэгүй багцын өдрийн хязгаар (Plus-д хязгааргүй)
     const quota = await checkQuota("ask");
     const text = await chat("text", [{ role: "system", content: system }, ...history], limits.ask);
     quota.commit();
-    return NextResponse.json({ text, remaining: quota.remaining });
+    return NextResponse.json({ text, remaining: quota.remaining, sources: toSources(hits) });
   } catch (err) {
     return errorResponse(err, "text");
   }

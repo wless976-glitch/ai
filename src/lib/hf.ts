@@ -19,6 +19,7 @@ import {
   AI_TASKS,
   AI_USAGE_HEADER,
   AiError,
+  LITE_MODE_ENABLED,
   MAX_PROMPT_CHARS,
   USES_OLLAMA,
   type AiIssue,
@@ -101,6 +102,8 @@ export async function guard() {
  * хэмнэлттэй. Зөвхөн хэрэглээг багасгадаг тул browser-т итгэхэд аюулгүй.
  */
 export function limitsFor(req: Request) {
+  // "Хэмнэлттэй" горим түр унтраалттай бол үргэлж бүрэн хязгаар
+  if (!LITE_MODE_ENABLED) return AI_LIMITS.full;
   return AI_LIMITS[req.headers.get(AI_USAGE_HEADER) === "full" ? "full" : "lite"];
 }
 

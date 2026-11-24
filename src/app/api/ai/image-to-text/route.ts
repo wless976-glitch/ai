@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { POST_WRITING_RULES } from "@/lib/academy/knowledge";
 import { checkQuota } from "@/lib/plan-server";
 import { blobToDataUrl, chat, errorResponse, guard, limitsFor, NO_INVENTED_FACTS, requireImage } from "@/lib/hf";
 
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
         ? "Энэ зурагт юу байгааг монгол хэлээр (кирилл) товч бөгөөд тодорхой тайлбарла: гол объект, өнгө, орчин, зураг дээрх бичиг."
         : `Энэ зурган дээрх бүтээгдэхүүн/үйлчилгээг ашиглан ${
             business ? `"${business}"-ийн ` : ""
-          }Facebook, Instagram-д зориулсан сонирхолтой пост бич. Монгол хэлээр (кирилл), 3–5 өгүүлбэр, тохиромжтой emoji, төгсгөлд уриалга, хамгийн сүүлд 3–5 hashtag. ${NO_INVENTED_FACTS} Зөвхөн постын текстийг буцаа.`;
+          }Facebook, Instagram-д зориулсан сонирхолтой пост бич. Монгол хэлээр (кирилл), 3–5 өгүүлбэр, тохиромжтой emoji, төгсгөлд уриалга, хамгийн сүүлд 3–5 hashtag. ${POST_WRITING_RULES} ${NO_INVENTED_FACTS} Зөвхөн постын текстийг буцаа.`;
 
     // Үнэгүй багцын өдрийн хязгаар (Plus-д хязгааргүй)
     const quota = await checkQuota("vision");

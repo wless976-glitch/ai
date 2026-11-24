@@ -6,6 +6,7 @@ import { PlusBadge } from "@/components/plus";
 import { Card, CardHeader, cn, MonoLabel, PageHeader, Progress } from "@/components/ui";
 import { fetchPlanUsage } from "@/lib/ai-client";
 import { planPostCount } from "@/lib/analytics";
+import { useToday } from "@/lib/today";
 import { formatMoney } from "@/lib/format";
 import { FREE_DAILY, MONTHLY_POSTS, PLAN_LABELS, PLUS_PRICE, QUOTA_LABELS, type PlanUsage, type Quota } from "@/lib/plan";
 import { useStore } from "@/lib/store";
@@ -28,7 +29,8 @@ export function PlanView() {
   const { posts } = useStore();
   const { plan, isPlus, isLoaded, monthlyPosts } = usePlan();
   const [usage, setUsage] = useState<PlanUsage | null>(null);
-  const monthCount = planPostCount(posts);
+  const today = useToday();
+  const monthCount = planPostCount(posts, today);
 
   useEffect(() => {
     if (!isLoaded) return;

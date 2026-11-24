@@ -1,8 +1,8 @@
 import { requirePlus } from "@/lib/plan-server";
 import { binary, errorResponse, guard, limitsFor, requireText, textToVideo } from "@/lib/hf";
 
-// Видео үүсгэх 1–5 минут үргэлжилж болно
-export const maxDuration = 600;
+// Видео үүсгэх 1–5 минут үргэлжилж болно. Vercel Hobby багцын дээд хязгаар 300 секунд.
+export const maxDuration = 300;
 
 /** Text to video: богино видео (MP4) үүсгэнэ */
 export async function POST(req: Request) {

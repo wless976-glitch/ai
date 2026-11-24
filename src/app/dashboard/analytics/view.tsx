@@ -23,7 +23,19 @@ import { PlusLock } from "@/components/plus";
 import { PostStatsModal } from "@/components/post-stats-modal";
 import { PostVisual } from "@/components/post-visual";
 import { DeltaPill, StatTile } from "@/components/stat-tile";
-import { Badge, Button, Card, CardHeader, PageHeader, PlatformIcon, PlatformIcons, Segmented, cn } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHeader,
+  EmptyState,
+  PageHeader,
+  PlatformIcon,
+  PlatformIcons,
+  Segmented,
+  cn,
+} from "@/components/ui";
 import {
   averageRate,
   boostSuggestions,
@@ -42,18 +54,19 @@ import {
   formatNumber,
   formatPercent,
   formatShortDate,
-  TODAY,
   WEEKDAYS_MON_FIRST,
 } from "@/lib/format";
 import {
   FOLLOWERS,
+  HAS_LIVE_STATS,
   HEATMAP,
   HEATMAP_SLOTS,
   IMPRESSIONS_PER_REACH,
-  NEW_FOLLOWERS_7D,
+  NEW_FOLLOWERS,
   REACH_SERIES,
-} from "@/lib/mock-data";
+} from "@/lib/live-stats";
 import { useStore } from "@/lib/store";
+import { useToday } from "@/lib/today";
 import { usePlan } from "@/lib/use-plan";
 import { PLATFORM_LABELS, type Platform } from "@/lib/types";
 
@@ -66,11 +79,40 @@ type Range = "7" | "30" | "60";
 type SortKey = "date" | "rate" | StatKey;
 type PlatformFilter = "all" | Platform;
 
-/** Өмнөх үед дагагч илүү удаан өсч байсан тул урт хугацаанд дундаж бага (жишээ өгөгдөл) */
-const FOLLOWER_SLOWDOWN: Record<Range, number> = { "7": 1, "30": 1.15, "60": 1.3 };
-
+/**
+ * Бодит статистик (Meta) холбогдоогүй үед зохиомол тоо биш, юу гарахыг тайлбарласан хоосон төлөв харуулна.
+ */
 export function AnalyticsView() {
+  if (!HAS_LIVE_STATS) return <AnalyticsEmpty />;
+  return <AnalyticsContent />;
+}
+
+function AnalyticsEmpty() {
+  return (
+    <>
+      <PageHeader
+        title="Үр дүн & Boost"
+        description="Постуудын хүрэлт, идэвх, дагагчийн өсөлт, идэвхтэй цаг, boost зөвлөмж."
+      />
+      <Card>
+        <EmptyState
+          icon={IconTrendingUp}
+          title="Статистик хараахан байхгүй"
+          description="Facebook, Instagram-ийн бодит статистикийг Meta-тай холбогдсоны дараа энд харуулна. Тест горимд зохиомол тоо харуулахгүй."
+          action={
+            <ButtonLink href="/dashboard/guides#m=boost&l=read-stats" variant="secondary">
+              Үзүүлэлтүүдийг хэрхэн унших вэ
+            </ButtonLink>
+          }
+        />
+      </Card>
+    </>
+  );
+}
+
+function AnalyticsContent() {
   const { posts, notify } = useStore();
+  const today = useToday();
   const { locked } = usePlan();
   const [range, setRange] = useState<Range>("30");
   const [metric, setMetric] = useState<"reach" | "impressions">("reach");
@@ -93,7 +135,7 @@ export function AnalyticsView() {
 
   // ---------- Хугацаа ----------
   const days = Number(range);
-  const since = addDays(TODAY, -days + 1);
+  const since = addDays(today, -days + 1);
   const prevSince = addDays(since, -days);
   const series = REACH_SERIES.slice(-days);
   // 60 хоногийн өмнөх үеийн өгөгдөл байхгүй — харьцуулалтыг нуух
@@ -117,7 +159,7 @@ export function AnalyticsView() {
 
   // ---------- Постын үзүүлэлтүүд ----------
   const pub = publishedPosts(posts);
-  const inRange = pub.filter((p) => p.date >= since && p.date <= TODAY);
+  const inRange = pub.filter((p) => p.date >= since && p.date <= today);
   const prevPosts = pub.filter((p) => p.date >= prevSince && p.date < since);
   const hasPrev = prevSeries.length > 0;
   const cur = sumStats(inRange);
@@ -130,10 +172,7 @@ export function AnalyticsView() {
   const prevCtr = clickRate(prev);
   const cmp = (a: number, b: number) => (hasPrev ? change(a, b) : undefined);
 
-  const newFollowers = {
-    facebook: Math.round((NEW_FOLLOWERS_7D.facebook * days) / 7 / FOLLOWER_SLOWDOWN[range]),
-    instagram: Math.round((NEW_FOLLOWERS_7D.instagram * days) / 7 / FOLLOWER_SLOWDOWN[range]),
-  };
+  const newFollowers = NEW_FOLLOWERS[range];
   const followersGain = newFollowers.facebook + newFollowers.instagram;
 
   // ---------- Хүснэгт ----------
@@ -154,7 +193,7 @@ export function AnalyticsView() {
 
   const topPosts = [...inRange].sort((a, b) => engagementRate(b.stats) - engagementRate(a.stats)).slice(0, 3);
 
-  const suggestions = boostSuggestions(posts);
+  const suggestions = boostSuggestions(posts, today);
   const suggestedIds = new Set(suggestions.map((s) => s.post.id));
 
   // ---------- Heatmap ----------
@@ -200,7 +239,7 @@ export function AnalyticsView() {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `tugee-statistic-${since}_${TODAY}.csv`;
+    a.download = `tugee-statistic-${since}_${today}.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     notify(`${sorted.length} постын статистикийг CSV-ээр татлаа`);
@@ -227,7 +266,7 @@ export function AnalyticsView() {
       <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
         <Badge tone="sky">Meta Graph API</Badge>
         <span>
-          {formatShortDate(since)} – {formatShortDate(TODAY)} · Жишээ өгөгдөл · Сүүлд шинэчилсэн: өнөөдөр 09:00
+          {formatShortDate(since)} – {formatShortDate(today)}
         </span>
         {!hasPrev && <span className="text-zinc-400">· 60 хоногийн өмнөх үетэй харьцуулах өгөгдөл алга</span>}
       </div>

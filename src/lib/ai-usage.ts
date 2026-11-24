@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { AI_USAGE_LABELS, DEFAULT_AI_USAGE, type AiUsage } from "./ai-models";
+import { AI_USAGE_OPTIONS, DEFAULT_AI_USAGE, type AiUsage } from "./ai-models";
 
 /** AI хэрэглээний түвшин — тухайн хөтөч дээр хадгална (Тохиргоо → AI хэрэглээ) */
 const KEY = "tg-ai-usage";
@@ -10,7 +10,8 @@ const listeners = new Set<() => void>();
 export function getAiUsage(): AiUsage {
   try {
     const v = localStorage.getItem(KEY);
-    return v && v in AI_USAGE_LABELS ? (v as AiUsage) : DEFAULT_AI_USAGE;
+    // Унтраасан горим (жишээ нь өмнө хадгалсан "Хэмнэлттэй") хадгалагдсан байвал үндсэн горимоор ажиллана
+    return v && AI_USAGE_OPTIONS.includes(v as AiUsage) ? (v as AiUsage) : DEFAULT_AI_USAGE;
   } catch {
     return DEFAULT_AI_USAGE;
   }

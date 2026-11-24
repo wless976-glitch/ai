@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Урьдчилсан render-ийн "өнөөдөр" (src/lib/today.ts) — browser-т ачаалагдмагц бодит огноо руу шилжинэ
+  env: {
+    BUILD_DATE: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ulaanbaatar" }),
+  },
   /* config options here */
   experimental: {
     agentFeedback: true,

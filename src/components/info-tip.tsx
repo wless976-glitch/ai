@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { GLOSSARY } from "@/lib/mock-data";
+import { GLOSSARY } from "@/lib/academy/glossary";
 import { IconInfo } from "./icons";
 import { cn } from "./ui";
 

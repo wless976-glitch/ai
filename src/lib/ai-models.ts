@@ -114,13 +114,21 @@ export class AiError extends Error {
  * Browser нь `x-ai-usage` header-ээр илгээнэ, сервер AI_LIMITS-ийг ашиглана.
  */
 export type AiUsage = "mock" | "lite" | "full";
-export const DEFAULT_AI_USAGE: AiUsage = "lite";
+
+/**
+ * "Хэмнэлттэй" горим (үндсэн) — токен хэмнэнэ. `false` болговол бүх AI хүсэлт "Бүрэн" хязгаараар
+ * явж, Тохиргоонд зөвхөн "Токенгүй" / "Бүрэн" сонголт үлдэнэ.
+ */
+export const LITE_MODE_ENABLED = true;
+export const DEFAULT_AI_USAGE: AiUsage = LITE_MODE_ENABLED ? "lite" : "full";
+/** Тохиргоонд харагдах сонголтууд */
+export const AI_USAGE_OPTIONS: AiUsage[] = LITE_MODE_ENABLED ? ["mock", "lite", "full"] : ["mock", "full"];
 export const AI_USAGE_HEADER = "x-ai-usage";
 
 export const AI_USAGE_LABELS: Record<AiUsage, { label: string; hint: string }> = {
   mock: { label: "Токенгүй", hint: "AI дуудахгүй, жишээ хариулт — 0 токен. Дэлгэц, урсгалыг шалгахад." },
-  lite: { label: "Хэмнэлттэй", hint: "Богино хариулт, сүүлийн 4 мессеж, жижиг зураг — тест хийхэд." },
-  full: { label: "Бүрэн", hint: "Урт хариулт, сүүлийн 12 мессеж, бүтэн хэмжээтэй зураг." },
+  lite: { label: "Хэмнэлттэй", hint: "Богино хариулт, сүүлийн 4 мессеж, 2 хичээлийн мэдлэг, жижиг зураг — тест хийхэд." },
+  full: { label: "Бүрэн", hint: "Урт хариулт, сүүлийн 12 мессеж, 3 хичээлийн мэдлэг, бүтэн хэмжээтэй зураг." },
 };
 
 /** Хариултын дээд урт (max_tokens), ярианы түүх, зургийн хэмжээ */
@@ -133,7 +141,10 @@ export const AI_LIMITS: Record<Exclude<AiUsage, "mock">, {
   posts: number;
   translate: number;
   smallImages: boolean;
+  /** Сургалтаас AI-д нэмэх мэдлэгийн дээд урт (тэмдэгт) ба хичээлийн тоо — оролтын токен */
+  knowledgeChars: number;
+  knowledgeHits: number;
 }> = {
-  lite: { ask: 350, askHistory: 4, askAssistantChars: 800, text: 400, vision: 300, posts: 1100, translate: 120, smallImages: true },
-  full: { ask: 1200, askHistory: 12, askAssistantChars: 4000, text: 1500, vision: 1200, posts: 2500, translate: 600, smallImages: false },
+  lite: { ask: 350, askHistory: 4, askAssistantChars: 800, text: 400, vision: 300, posts: 1100, translate: 120, smallImages: true, knowledgeChars: 1200, knowledgeHits: 2 },
+  full: { ask: 1200, askHistory: 12, askAssistantChars: 4000, text: 1500, vision: 1200, posts: 2500, translate: 600, smallImages: false, knowledgeChars: 3200, knowledgeHits: 3 },
 };

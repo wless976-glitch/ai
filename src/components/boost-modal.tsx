@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { estimateBoost, type PublishedPost } from "@/lib/analytics";
+import Link from "next/link";
+import type { PublishedPost } from "@/lib/analytics";
 import { engagementRate, formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { useStore } from "@/lib/store";
-import { IconFlask, IconUsers } from "./icons";
+import { IconArrowRight, IconFlask, IconWallet } from "./icons";
 import { Modal } from "./modal";
 import { PostVisual } from "./post-visual";
 import { Button, Field, inputClass, PlatformIcons, Segmented } from "./ui";
@@ -32,7 +33,7 @@ export function BoostModal({
   const [ageMin, setAgeMin] = useState(18);
   const [ageMax, setAgeMax] = useState(45);
 
-  const est = estimateBoost(budget, Number(days), location);
+  const perDay = Math.round(budget / Number(days) / 100) * 100;
 
   function start() {
     updatePost(post.id, { boosted: true });
@@ -143,17 +144,22 @@ export function BoostModal({
 
         <div className="rounded-xl bg-brand-50 p-4 ring-1 ring-brand-200/70">
           <p className="flex items-center gap-2 text-sm font-medium text-brand-800">
-            <IconUsers className="size-4" /> Тооцоолсон үр дүн
+            <IconWallet className="size-4" /> Өдрийн төсөв
           </p>
           <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900">
-            {formatNumber(est.low)} – {formatNumber(est.high)} <span className="text-base font-normal">хүнд хүрнэ</span>
+            ≈ {formatMoney(perDay)} <span className="text-base font-normal">/ өдөр</span>
           </p>
-          <p className="mt-0.5 text-[13px] text-zinc-600">Өдөрт ойролцоогоор {formatMoney(est.perDay)}</p>
+          <p className="mt-0.5 text-[13px] text-zinc-600">
+            Хэдэн хүнд хүрэхийг Meta урьдчилан хэлдэг бөгөөд үзэгч, улирлаас хамаарна.{" "}
+            <Link href="/dashboard/guides#m=boost&l=bo-budget" className="font-medium text-brand-700 hover:underline">
+              Өөрийн CPM-ээр тооцоолох <IconArrowRight className="inline size-3.5" />
+            </Link>
+          </p>
         </div>
 
         <p className="flex items-start gap-2 text-xs text-zinc-500">
           <IconFlask className="mt-px size-4 shrink-0 text-amber-500" />
-          Тест горим: тооцоо нь жишээ томьёогоор гарсан бөгөөд бодит төлбөр, Meta Ads дуудлага хийгдэхгүй.
+          Тест горим: бодит төлбөр, Meta Ads дуудлага хийгдэхгүй.
         </p>
       </div>
     </Modal>

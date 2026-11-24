@@ -29,7 +29,7 @@ type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 const USER_LINKS: { href: string; label: string; icon: Icon }[] = [
   { href: "/dashboard/settings", label: "Тохиргоо", icon: IconSliders },
-  { href: "/dashboard/guides", label: "Заавар", icon: IconBook },
+  { href: "/dashboard/guides", label: "Сургалт", icon: IconBook },
 ];
 
 /** Сумаар шилжих боломжтой мөрүүд (өнгөний горимын товчнууд нь menuitemradio) */
@@ -60,10 +60,10 @@ export function UserMenu({ businessName, onNavigate }: { businessName: string; o
   const plan: Plan = isSignedIn ? planOf(user.publicMetadata) : "free";
   const name = isSignedIn
     ? user.fullName || user.username || user.primaryEmailAddress?.emailAddress.split("@")[0] || businessName
-    : businessName;
+    : businessName || "Зочин";
   const email = isSignedIn ? (user.primaryEmailAddress?.emailAddress ?? null) : null;
   // Энэ цэсээр нээгддэг хуудсанд байх үед товчийг тодруулна (хажуу цэсэнд эдгээр байхгүй)
-  const onMenuPage = ["/dashboard/admin", "/dashboard/settings", "/dashboard/guides", "/dashboard/plan"].some((h) =>
+  const onMenuPage = ["/dashboard/admin", "/dashboard/settings", "/dashboard/plan"].some((h) =>
     pathname.startsWith(h),
   );
 

@@ -2,10 +2,12 @@
  * Browser талаас /api/ai/* route-уудыг дуудах функцууд.
  * HF_TOKEN энд хэзээ ч ирэхгүй — бүх дуудлага серверээр дамжина.
  */
-import { AI_USAGE_HEADER, type AiIssue, type AiStatus } from "./ai-models";
+import { AI_USAGE_HEADER, AI_USAGE_LABELS, DEFAULT_AI_USAGE, type AiIssue, type AiStatus } from "./ai-models";
 import { getAiUsage } from "./ai-usage";
+import type { KnowledgeSource } from "./academy/knowledge";
 import type { GenerateInput } from "./mock-ai";
 import type { PlanUsage } from "./plan";
+import { mockReelScript, type ReelLength, type ReelScript, type ReelTemplate, type ReelVoice } from "./reel";
 import type { BusinessProfile, VideoScene } from "./types";
 
 export class AiRequestError extends Error {
@@ -78,7 +80,7 @@ export async function fetchAiStatus(): Promise<AiStatus> {
 
 const isMock = () => getAiUsage() === "mock";
 const pause = () => new Promise((r) => setTimeout(r, 500));
-const MOCK_SWITCH = "Бодит хариулт авах бол Тохиргоо → AI хэрэглээ хэсгээс «Хэмнэлттэй»-г сонгоно уу.";
+const MOCK_SWITCH = `Бодит хариулт авах бол Тохиргоо → AI хэрэглээ хэсгээс «${AI_USAGE_LABELS[DEFAULT_AI_USAGE].label}» горимыг сонгоно уу.`;
 
 function mockAnswer(question: string) {
   const q = question.replace(/\s+/g, " ").trim().slice(0, 140);
@@ -123,17 +125,37 @@ export interface AskMessage {
   content: string;
 }
 
+export interface AskResult {
+  text: string;
+  /** Үнэгүй багцад өнөөдөр үлдсэн асуулт (Plus-д null) */
+  remaining: number | null;
+  /** Хариултад ашигласан сургалтын хичээлүүд */
+  sources: KnowledgeSource[];
+}
+
 /**
  * "AI-аас асуух" чат — ярианы түүхийг илгээж дараагийн хариултыг авна.
- * `remaining` нь Үнэгүй багцад өнөөдөр үлдсэн асуулт (Plus-д null).
+ * «Токенгүй» горимд AI-ийн оронд Сургалтаас хамгийн хамааралтай хичээлийг хариулна (0 токен).
  */
-export async function askAI(messages: AskMessage[], business?: Partial<BusinessProfile>) {
+export async function askAI(messages: AskMessage[], business?: Partial<BusinessProfile>): Promise<AskResult> {
   if (isMock()) {
+    const question = messages.at(-1)?.content ?? "";
+    const found = await call("/api/knowledge", json({ question }))
+      .then((r) => r.json() as Promise<{ text: string; sources: KnowledgeSource[] }>)
+      .catch(() => ({ text: "", sources: [] }));
+    if (found.text) {
+      return {
+        text: `${found.text}\n\n«Токенгүй» горим: AI биш, Сургалтын хичээлээс ишлэв. ${MOCK_SWITCH}`,
+        remaining: null,
+        sources: found.sources,
+      };
+    }
     await pause();
-    return { text: mockAnswer(messages.at(-1)?.content ?? ""), remaining: null };
+    return { text: mockAnswer(question), remaining: null, sources: [] };
   }
   const res = await call("/api/ai/ask", json({ messages, business }));
-  return (await res.json()) as { text: string; remaining: number | null };
+  const data = (await res.json()) as Partial<AskResult> & { text: string };
+  return { text: data.text, remaining: data.remaining ?? null, sources: Array.isArray(data.sources) ? data.sources : [] };
 }
 
 /** Одоогийн багц ба өнөөдрийн AI хэрэглээ */
@@ -174,6 +196,46 @@ export async function imageToImage(image: Blob, prompt: string) {
 export async function textToVideo(prompt: string) {
   if (isMock()) throw new AiRequestError(`«Токенгүй» горимд видео үүсгэхгүй. ${MOCK_SWITCH}`, "mock_mode");
   return media(await call("/api/ai/text-to-video", json({ prompt })));
+}
+
+export interface ReelInput {
+  question: string;
+  template: ReelTemplate;
+  length: ReelLength;
+  business: Pick<BusinessProfile, "name" | "industry" | "description">;
+}
+
+/** Reels түүхийн сценари. Токенгүй горимд жишээ сценари буцаана (видеог нь бүрэн зурна). */
+export async function generateReel(input: ReelInput): Promise<ReelScript> {
+  if (isMock()) return pause().then(() => mockReelScript(input.question, input.business.name, input.length));
+  const res = await call("/api/ai/reel", json(input));
+  return ((await res.json()) as { script: ReelScript }).script;
+}
+
+export interface VoiceStatus {
+  available: boolean;
+  provider: "voicestudio" | "azure" | null;
+  /** VOICESTUDIO_URL тохируулсан ч програм нь асаагүй */
+  voiceStudioOffline: boolean;
+}
+
+/** Монгол хоолой (VoiceStudio эсвэл Azure Speech) ашиглах боломжтой эсэх */
+export async function fetchVoiceStatus(): Promise<VoiceStatus> {
+  try {
+    const res = await fetch("/api/ai/tts", { cache: "no-store" });
+    if (!res.ok) throw new Error();
+    const body = (await res.json()) as { available?: boolean; provider?: VoiceStatus["provider"]; voiceStudioConfigured?: boolean };
+    const available = Boolean(body.available);
+    return { available, provider: body.provider ?? null, voiceStudioOffline: !available && Boolean(body.voiceStudioConfigured) };
+  } catch {
+    return { available: false, provider: null, voiceStudioOffline: false };
+  }
+}
+
+export async function synthesizeVoice(text: string, voice: Exclude<ReelVoice, "none">): Promise<Blob> {
+  if (isMock()) throw new AiRequestError("«Токенгүй» горимд хоолой үүсгэхгүй.", "mock_mode");
+  const res = await call("/api/ai/tts", json({ text, voice }));
+  return res.blob();
 }
 
 /**

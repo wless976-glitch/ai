@@ -9,7 +9,7 @@
 import { createContext, use, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { defaultModels, type AiStatus } from "./ai-models";
 import { fetchAiStatus, onAiIssue } from "./ai-client";
-import { BUSINESS, INITIAL_POSTS, SETTINGS } from "./mock-data";
+import { BUSINESS, LEGACY_DEMO_BUSINESS, LEGACY_DEMO_POST_IDS, SETTINGS } from "./mock-data";
 import type { AutomationSettings, BusinessProfile, Connections, Platform, Post } from "./types";
 
 export type ToastTone = "success" | "info" | "error";
@@ -26,7 +26,10 @@ interface Data {
   business: BusinessProfile;
   connections: Connections;
   settings: AutomationSettings;
+  /** Сургалтын уншсан хичээлүүдийн id */
   readGuides: string[];
+  /** Сургалтын модуль бүрийн шалгалтын хамгийн өндөр оноо (0–1) */
+  quizScores: Record<string, number>;
   /** Хянах самбарын "Эхлэх алхмууд" картыг нуусан эсэх */
   onboardingHidden: boolean;
 }
@@ -35,11 +38,13 @@ const STORAGE_KEY = "tugee:data:v1";
 
 /** Серверийн render болон анхны hydration энэ тогтмол объектыг ашиглана */
 const DEFAULT_DATA: Data = {
-  posts: INITIAL_POSTS,
+  posts: [],
   business: BUSINESS,
-  connections: { facebook: true, instagram: true },
+  // Бодитоор холбогдоогүй тул анхдагчаар холбоогүй
+  connections: { facebook: false, instagram: false },
   settings: SETTINGS,
-  readGuides: ["connect-tugee"],
+  readGuides: [],
+  quizScores: {},
   onboardingHidden: false,
 };
 
@@ -51,12 +56,19 @@ function readStorage(): Data {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_DATA;
     const saved = JSON.parse(raw) as Partial<Data>;
+    // Өмнөх хувилбарын зохиомол жишээ пост, бизнесийг хадгалсан өгөгдлөөс цэвэрлэнэ
+    const isDemoBusiness =
+      saved.business?.name === LEGACY_DEMO_BUSINESS.name && saved.business?.handle === LEGACY_DEMO_BUSINESS.handle;
     return {
-      posts: Array.isArray(saved.posts) ? saved.posts : DEFAULT_DATA.posts,
-      business: { ...DEFAULT_DATA.business, ...saved.business },
+      posts: Array.isArray(saved.posts) ? saved.posts.filter((p) => !LEGACY_DEMO_POST_IDS.has(p?.id)) : DEFAULT_DATA.posts,
+      business: isDemoBusiness ? DEFAULT_DATA.business : { ...DEFAULT_DATA.business, ...saved.business },
       connections: { ...DEFAULT_DATA.connections, ...saved.connections },
       settings: { ...DEFAULT_DATA.settings, ...saved.settings },
       readGuides: Array.isArray(saved.readGuides) ? saved.readGuides : DEFAULT_DATA.readGuides,
+      quizScores:
+        saved.quizScores && typeof saved.quizScores === "object" && !Array.isArray(saved.quizScores)
+          ? saved.quizScores
+          : DEFAULT_DATA.quizScores,
       onboardingHidden: saved.onboardingHidden === true,
     };
   } catch {
@@ -135,6 +147,10 @@ interface Store extends Data {
   setConnections: (c: Connections) => void;
   setSettings: (s: AutomationSettings) => void;
   toggleGuideRead: (id: string) => void;
+  /** Уншсан гэж тэмдэглэнэ (аль хэдийн уншсан бол юу ч хийхгүй) */
+  markGuideRead: (id: string) => void;
+  /** Шалгалтын оноог хадгална — өмнөхөөс өндөр бол л шинэчилнэ */
+  saveQuizScore: (moduleId: string, score: number) => void;
   setOnboardingHidden: (hidden: boolean) => void;
   resetData: () => void;
   notify: (message: string, tone?: ToastTone) => void;
@@ -192,6 +208,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ...d,
         readGuides: d.readGuides.includes(id) ? d.readGuides.filter((g) => g !== id) : [...d.readGuides, id],
       })),
+    markGuideRead: (id) =>
+      update((d) => (d.readGuides.includes(id) ? d : { ...d, readGuides: [...d.readGuides, id] })),
+    saveQuizScore: (moduleId, score) =>
+      update((d) =>
+        (d.quizScores[moduleId] ?? -1) >= score ? d : { ...d, quizScores: { ...d.quizScores, [moduleId]: score } },
+      ),
     setOnboardingHidden: (onboardingHidden) => update((d) => ({ ...d, onboardingHidden })),
     resetData: () => update(() => DEFAULT_DATA),
     notify,

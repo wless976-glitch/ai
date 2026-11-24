@@ -372,3 +372,25 @@ export const IconDice = icon(
   </>,
   "IconDice",
 );
+export const IconPlay = icon(<path d="M7 4.5v15l13-7.5-13-7.5Z" />, "IconPlay");
+export const IconPause = icon(
+  <>
+    <rect x="6" y="4.5" width="4" height="15" rx="1" />
+    <rect x="14" y="4.5" width="4" height="15" rx="1" />
+  </>,
+  "IconPause",
+);
+export const IconVolume = icon(
+  <>
+    <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+    <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+  </>,
+  "IconVolume",
+);
+export const IconVolumeOff = icon(
+  <>
+    <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+    <path d="m16 9 5 6M21 9l-5 6" />
+  </>,
+  "IconVolumeOff",
+);

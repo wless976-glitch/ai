@@ -18,6 +18,7 @@ import { useAiUsage } from "@/lib/ai-usage";
 import { useStore } from "@/lib/store";
 import {
   IconAlert,
+  IconBook,
   IconCalendar,
   IconChart,
   IconCheck,
@@ -30,6 +31,7 @@ import {
   IconSidebar,
   IconSparkles,
   IconTrash,
+  IconVideo,
   IconWand,
   IconX,
 } from "./icons";
@@ -42,12 +44,16 @@ import { Button, cn, MonoLabel } from "./ui";
 /**
  * Claude-ийн нүүр хуудастай төстэй хажуу цэс. Дээд талын горимын товчоор (Claude-ийн Chat / Code шиг)
  * агуулга солигдоно:
- * - Яриа: "Шинэ яриа", AI студи, сүүлийн ярианууд
- * - Өдөр тутам: Хянах самбар, Пост бэлдэх, Хуанли, Үр дүн
- * Хамгийн доор профайл (Тохиргоо, Заавар, Багц, өнгөний горим — user-menu.tsx).
+ * - Яриа: "Шинэ яриа", AI студи, Видео студи, Сургалт, сүүлийн ярианууд
+ * - Өдөр тутам: Хянах самбар, Пост бэлдэх, Хуанли, Үр дүн, Сургалт
+ * Хамгийн доор профайл (Тохиргоо, Сургалт, Багц, өнгөний горим — user-menu.tsx).
  * Том дэлгэцэнд дүрс төдий болгож хураана (src/lib/sidebar.ts).
  */
-const NAV_ITEMS = [{ href: "/dashboard/studio", label: "AI студи", icon: IconWand }];
+const NAV_ITEMS = [
+  { href: "/dashboard/studio", label: "AI студи", icon: IconWand },
+  { href: "/dashboard/video", label: "Видео студи", icon: IconVideo },
+  { href: "/dashboard/guides", label: "Сургалт", icon: IconBook },
+];
 
 const MODES: { mode: SidebarMode; label: string; icon: Icon }[] = [
   { mode: "chat", label: "Яриа", icon: IconMessage },
@@ -59,6 +65,7 @@ const DAILY_ITEMS = [
   { href: "/dashboard/create", label: "Пост бэлдэх", icon: IconSparkles },
   { href: "/dashboard/calendar", label: "Хуанли", icon: IconCalendar },
   { href: "/dashboard/analytics", label: "Үр дүн & Boost", icon: IconChart },
+  { href: "/dashboard/guides", label: "Сургалт", icon: IconBook },
 ];
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -199,7 +206,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        {/* Профайл: дарахад хэрэглэгчийн цэс (Тохиргоо, Заавар, Багц, өнгөний горим), админд админ цэс */}
+        {/* Профайл: дарахад хэрэглэгчийн цэс (Тохиргоо, Сургалт, Багц, өнгөний горим), админд админ цэс */}
         <div className="relative shrink-0 border-t border-white/[0.06] p-2">
           <Suspense fallback={<div className="h-11 rounded-xl bg-white/[0.04]" />}>
             <UserMenu businessName={business.name} onNavigate={close} />
@@ -232,9 +239,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <MonoLabel className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10.5px] text-amber-900 ring-1 ring-inset ring-amber-200/70">
             <IconFlask className="size-3.5" /> Тест горим
           </MonoLabel>
-          <span className="hidden min-w-0 truncate sm:inline">Юу ч бодитоор нийтлэгдэхгүй, тоо баримт жишээ.</span>
+          <span className="hidden min-w-0 truncate sm:inline">Юу ч бодитоор нийтлэгдэхгүй, статистик холбогдоогүй.</span>
           <InfoTip label="Тест горим гэж юу вэ?" className="text-zinc-400 hover:text-zinc-900">
-            Facebook, Instagram (Meta Graph API) холбогдоогүй тул пост бодитоор нийтлэгдэхгүй, статистик нь жишээ.{" "}
+            Facebook, Instagram (Meta Graph API) холбогдоогүй тул пост бодитоор нийтлэгдэхгүй, статистик харуулахгүй.{" "}
             {ai?.connected && !ai.issue
               ? "AI (Hugging Face) холбогдсон — текст, зургийг бодитоор үүсгэнэ."
               : ai?.connected

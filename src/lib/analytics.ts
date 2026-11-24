@@ -1,5 +1,4 @@
-import { addDays, engagementRate, TODAY } from "./format";
-import { INITIAL_POSTS } from "./mock-data";
+import { addDays, engagementRate } from "./format";
 import type { Post, PostStats } from "./types";
 
 export type PublishedPost = Post & { stats: PostStats };
@@ -8,20 +7,15 @@ export function publishedPosts(posts: Post[]): PublishedPost[] {
   return posts.filter((p): p is PublishedPost => p.status === "published" && !!p.stats);
 }
 
-/** Энэ сард (TODAY-ийн сар) төлөвлөсөн болон нийтэлсэн постын тоо — татгалзсаныг тооцохгүй */
-export function monthPostCount(posts: Post[]) {
-  const month = TODAY.slice(0, 7);
+/** Энэ сард (today-ийн сар) төлөвлөсөн болон нийтэлсэн постын тоо — татгалзсаныг тооцохгүй */
+export function monthPostCount(posts: Post[], today: string) {
+  const month = today.slice(0, 7);
   return posts.filter((p) => p.date.startsWith(month) && p.status !== "rejected").length;
 }
 
-const SAMPLE_POST_IDS = new Set(INITIAL_POSTS.map((p) => p.id));
-
-/**
- * Багцын сарын хязгаарт тооцох пост: энэ сарын, хэрэглэгч өөрөө бэлдсэн пост.
- * Тест горимын жишээ постууд (INITIAL_POSTS) тоологдохгүй — эс тэгвэл Үнэгүй багц анхнаасаа хязгаартаа хүрнэ.
- */
-export function planPostCount(posts: Post[]) {
-  return monthPostCount(posts.filter((p) => !SAMPLE_POST_IDS.has(p.id)));
+/** Багцын сарын хязгаарт тооцох пост: энэ сарын, татгалзаагүй пост */
+export function planPostCount(posts: Post[], today: string) {
+  return monthPostCount(posts, today);
 }
 
 /** "1.7 дахин өндөр" эсвэл бага зөрүүтэй үед "12%-иар өндөр" */
@@ -46,11 +40,11 @@ export interface BoostSuggestion {
  * Boost зөвлөмж: сүүлийн 14 хоногт нийтлэгдсэн, идэвхийн хувь нь дунджаас өндөр
  * боловч хүрэлт нь бага хэвээр байгаа постуудыг санал болгоно.
  */
-export function boostSuggestions(posts: Post[]): BoostSuggestion[] {
+export function boostSuggestions(posts: Post[], today: string): BoostSuggestion[] {
   const pub = publishedPosts(posts);
   const avg = averageRate(pub);
   const avgReach = pub.reduce((s, p) => s + p.stats.reach, 0) / Math.max(pub.length, 1);
-  const since = addDays(TODAY, -14);
+  const since = addDays(today, -14);
   return pub
     .filter((p) => !p.boosted && p.date >= since)
     .map((p) => ({ post: p, rate: engagementRate(p.stats) }))
@@ -65,14 +59,6 @@ export function boostSuggestions(posts: Post[]): BoostSuggestion[] {
           : `Идэвхийн хувь дунджаас ${higherBy(times)} — хүмүүст таалагдаж байна`;
       return { post, rate, reason, budget: post.stats.clicks > 80 ? 40000 : 30000 };
     });
-}
-
-/** Boost-ийн хүрэлтийн тооцоо (тест — бодит Meta тооцоолол биш) */
-export function estimateBoost(budget: number, days: number, location: string) {
-  const factor = location === "mongolia" ? 1.25 : location === "ub" ? 1 : 0.8;
-  const low = Math.round(((budget / 1000) * 140 * factor) / 100) * 100;
-  const high = Math.round(((budget / 1000) * 230 * factor) / 100) * 100;
-  return { low, high, perDay: Math.round(budget / days / 100) * 100 };
 }
 
 export const EMPTY_STATS: PostStats = { reach: 0, impressions: 0, reactions: 0, comments: 0, shares: 0, saves: 0, clicks: 0 };

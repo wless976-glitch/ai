@@ -2,6 +2,7 @@
 
 import { averageRate, clickRate, type PublishedPost } from "@/lib/analytics";
 import { engagement, engagementRate, formatDate, formatNumber, formatPercent } from "@/lib/format";
+import { useToday } from "@/lib/today";
 import { SegmentedBar } from "./charts";
 import { IconRocket, IconSparkles } from "./icons";
 import { TermTip } from "./info-tip";
@@ -24,6 +25,7 @@ export function PostStatsModal({
   onClose: () => void;
   onBoost: () => void;
 }) {
+  const today = useToday();
   const n = Math.max(all.length, 1);
   const rate = engagementRate(post.stats);
   const avgRate = averageRate(all);
@@ -44,7 +46,7 @@ export function PostStatsModal({
       onClose={onClose}
       size="lg"
       title={post.topic}
-      description={`${formatDate(post.date)} · ${post.time}-д нийтлэгдсэн`}
+      description={`${formatDate(post.date, today)} · ${post.time}-д нийтлэгдсэн`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>

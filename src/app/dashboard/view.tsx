@@ -16,7 +16,6 @@ import {
   IconCheckCircle,
   IconClock,
   IconEye,
-  IconFlame,
   IconHeart,
   IconRocket,
   IconSparkles,
@@ -44,12 +43,13 @@ import {
   formatNumber,
   formatPercent,
   parseDate,
-  TODAY,
   WEEKDAYS_FULL,
   weekday,
 } from "@/lib/format";
-import { NEW_FOLLOWERS_7D, REACH_SERIES, TIPS, WEEKLY_POSTS } from "@/lib/mock-data";
+import { DAILY_TIPS } from "@/lib/academy/tips";
+import { HAS_LIVE_STATS, NEW_FOLLOWERS_7D, REACH_SERIES } from "@/lib/live-stats";
 import { useStore } from "@/lib/store";
+import { useToday } from "@/lib/today";
 import { usePlan } from "@/lib/use-plan";
 import type { Post } from "@/lib/types";
 
@@ -63,10 +63,11 @@ export function DashboardView() {
   const { locked } = usePlan();
   const [boost, setBoost] = useState<BoostSuggestion | null>(null);
   const [viewing, setViewing] = useState<Post | null>(null);
+  const today = useToday();
 
   const pending = posts.filter((p) => p.status === "pending").sort(byDateTime);
   const upcoming = posts
-    .filter((p) => p.status === "scheduled" && p.date >= TODAY)
+    .filter((p) => p.status === "scheduled" && p.date >= today)
     .sort(byDateTime)
     .slice(0, 4);
   const pub = publishedPosts(posts);
@@ -75,16 +76,28 @@ export function DashboardView() {
   const reach7 = sum(REACH_SERIES.slice(-7));
   const reachPrev7 = sum(REACH_SERIES.slice(-14, -7));
   const reachChange = reach7 / reachPrev7 - 1;
-  const rate = averageRate(pub.filter((p) => p.date >= addDays(TODAY, -14)));
+  const rate = averageRate(pub.filter((p) => p.date >= addDays(today, -14)));
   const followers = NEW_FOLLOWERS_7D.facebook + NEW_FOLLOWERS_7D.instagram;
   const goal = settings.postsPerWeek * 4;
-  const monthCount = monthPostCount(posts);
-  const weekEnd = addDays(TODAY, 6);
+  const monthCount = monthPostCount(posts, today);
+  const weekEnd = addDays(today, 6);
   const thisWeek = posts.filter(
-    (p) => (p.status === "scheduled" || p.status === "pending") && p.date >= TODAY && p.date <= weekEnd,
+    (p) => (p.status === "scheduled" || p.status === "pending") && p.date >= today && p.date <= weekEnd,
   ).length;
-  const topBoost = boostSuggestions(posts)[0];
-  const { m, d } = parseDate(TODAY);
+  const topBoost = boostSuggestions(posts, today)[0];
+  const { m, d } = parseDate(today);
+  // Сүүлийн 8 долоо хоногт нийтэлсэн/төлөвлөсөн постын тоо — хэрэглэгчийн бодит постуудаас
+  const weeklyPosts = Array.from({ length: 8 }, (_, i) => {
+    const start = addDays(today, -7 * (7 - i) - 6);
+    const end = addDays(start, 6);
+    const { m: sm, d: sd } = parseDate(start);
+    const count = posts.filter(
+      (p) => (p.status === "published" || p.status === "scheduled") && p.date >= start && p.date <= end,
+    ).length;
+    return { label: `${sm}/${sd}`, count };
+  });
+  const thisWeekCount = weeklyPosts[7].count;
+  const tip = DAILY_TIPS[weekday(today) % DAILY_TIPS.length];
 
   function approve(id: string) {
     updatePost(id, { status: "scheduled" });
@@ -94,10 +107,10 @@ export function DashboardView() {
   return (
     <>
       <PageHeader
-        title={`Сайн байна уу, ${business.name} 👋`}
+        title={business.name ? `Сайн байна уу, ${business.name} 👋` : "Сайн байна уу 👋"}
         description={
           <>
-            {m}-р сарын {d}, {WEEKDAYS_FULL[weekday(TODAY)]}. Ирэх 7 хоногт {thisWeek} пост төлөвлөгдсөн.
+            {m}-р сарын {d}, {WEEKDAYS_FULL[weekday(today)]}. Ирэх 7 хоногт {thisWeek} пост төлөвлөгдсөн.
             {pending.length > 0 && (
               <>
                 {" "}
@@ -153,7 +166,7 @@ export function DashboardView() {
                       <p className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">
                         <PlatformIcons platforms={p.platforms} className="scale-75 origin-left" />
                         <span className="-ml-2">
-                          {formatDate(p.date)} · {p.time}
+                          {formatDate(p.date, today)} · {p.time}
                         </span>
                       </p>
                     </div>
@@ -218,21 +231,18 @@ export function DashboardView() {
                 <h2 className="flex items-center gap-1.5 text-[15px] font-semibold text-zinc-900">
                   Тогтмол байдал
                   <InfoTip label="Тогтмол байдал">
-                    Багана бүр нэг 7 хоногт оруулсан постын тоо. Тасархай зураас бол таны зорилго (7 хоногт{" "}
-                    {settings.postsPerWeek}). Тогтмол оруулах тусам дагагчид таныг илүү харна.
+                    Багана бүр нэг 7 хоногт нийтэлсэн, төлөвлөсөн постын тоо. Тасархай зураас бол таны зорилго (7
+                    хоногт {settings.postsPerWeek}).
                   </InfoTip>
                 </h2>
                 <p className="mt-0.5 text-[13px] text-zinc-500">7 хоног тутмын постын тоо</p>
               </div>
-              <Badge tone="amber" className="shrink-0">
-                <IconFlame className="size-3.5" /> 1 долоо хоног дараалж
-              </Badge>
             </div>
             <div className="mt-5">
-              <MiniBars data={WEEKLY_POSTS} goal={settings.postsPerWeek} />
+              <MiniBars data={weeklyPosts} goal={settings.postsPerWeek} />
             </div>
             <p className="mt-3 text-[13px] text-zinc-600">
-              Тогтмол пост оруулж эхэлснээс хойш 7 хоногийн хүрэлт <b className="text-emerald-600">2.4 дахин</b> өссөн.
+              Энэ 7 хоногт <b className="text-zinc-900">{thisWeekCount}</b> / {settings.postsPerWeek} пост.
             </p>
           </Card>
 
@@ -241,12 +251,12 @@ export function DashboardView() {
             <p className="flex items-center gap-1.5 text-[13px] font-medium text-amber-700">
               <IconBulb className="size-4" /> Өнөөдрийн зөвлөгөө
             </p>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-700">{TIPS[0]}</p>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-700">{tip.text}</p>
             <Link
-              href="/dashboard/guides"
+              href={`/dashboard/guides${tip.href}`}
               className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-brand-700 hover:underline"
             >
-              Бүх заавар <IconArrowRight className="size-3.5" />
+              Хичээлийг үзэх <IconArrowRight className="size-3.5" />
             </Link>
           </Card>
         </div>
@@ -255,6 +265,8 @@ export function DashboardView() {
       {/* 2. Үр дүн — тоон үзүүлэлт, хүрэлт, boost */}
       <h2 className="mb-3 mt-10 text-lg font-medium tracking-[-0.02em] text-zinc-900">Үр дүн</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {HAS_LIVE_STATS ? (
+          <>
         <StatTile
           icon={IconEye}
           tone="brand"
@@ -273,10 +285,8 @@ export function DashboardView() {
           value={formatPercent(rate)}
           sub={
             <>
-              <span className={rate > 0.03 ? "font-medium text-emerald-700" : "font-medium text-amber-700"}>
-                {rate > 0.03 ? "Сайн" : "Дунд"}
-              </span>{" "}
-              · 14 хоног · ердийн нь 1–3%
+
+              · 14 хоног
             </>
           }
         />
@@ -288,6 +298,19 @@ export function DashboardView() {
           value={`+${followers}`}
           sub={`FB +${NEW_FOLLOWERS_7D.facebook} · IG +${NEW_FOLLOWERS_7D.instagram} · 7 хоног`}
         />
+          </>
+        ) : (
+          <Card className="col-span-2 flex gap-3 p-4 lg:col-span-3">
+            <IconChip icon={IconEye} tone="brand" />
+            <div>
+              <p className="text-sm font-medium text-zinc-900">Хүрэлт, идэвх, дагагчийн статистик хараахан байхгүй</p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-zinc-500">
+                Facebook, Instagram-ийн бодит статистикийг Meta-тай холбогдсоны дараа энд харуулна. Одоогоор тест горимд
+                зохиомол тоо харуулахгүй.
+              </p>
+            </div>
+          </Card>
+        )}
         <Card className="p-4 transition-shadow duration-200 hover:shadow-card-hover">
           <div className="flex items-center gap-2.5">
             <IconChip icon={IconCalendar} tone="amber" />
@@ -312,12 +335,13 @@ export function DashboardView() {
 
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
+        {HAS_LIVE_STATS && (
         <div className={topBoost ? "xl:col-span-2" : "xl:col-span-3"}>
           {/* Хүрэлт */}
           <Card>
             <CardHeader
               title="Хүрэлт — сүүлийн 14 хоног"
-              description="Meta Graph API · жишээ өгөгдөл"
+              description="Meta Graph API"
               action={
                 <Link href="/dashboard/analytics" className="text-[13px] font-medium text-brand-700 hover:underline">
                   Дэлгэрэнгүй
@@ -332,6 +356,7 @@ export function DashboardView() {
             </div>
           </Card>
         </div>
+        )}
         <div className="xl:content-start">
           {/* Boost зөвлөмж */}
           {topBoost && (

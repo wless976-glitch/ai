@@ -30,8 +30,8 @@ export function PostPreview({
   hashtags,
   visual,
   platforms,
-  businessName,
-  handle,
+  businessName: rawName,
+  handle: rawHandle,
 }: {
   caption: string;
   hashtags: string[];
@@ -40,6 +40,9 @@ export function PostPreview({
   businessName: string;
   handle: string;
 }) {
+  // Бизнесийн нэр бөглөөгүй бол урьдчилан харахад ерөнхий нэр
+  const businessName = rawName || "Таны бизнес";
+  const handle = rawHandle || "tanii.biznes";
   const [tab, setTab] = useState<Platform>(platforms[0] ?? "facebook");
   const active = platforms.includes(tab) ? tab : (platforms[0] ?? "facebook");
 

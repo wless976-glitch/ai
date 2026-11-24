@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import type { KnowledgeSource } from "./academy/knowledge";
 
 /**
  * "AI-аас асуух" ярианы түүх — олон яриа, тухайн хөтөч дээр localStorage-д хадгална.
@@ -13,6 +14,8 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** AI хариултад ашигласан Сургалтын хичээлүүд — хариултын доор холбоос болж харагдана */
+  sources?: KnowledgeSource[];
 }
 
 export interface Conversation {
@@ -166,4 +169,29 @@ export function useChatMessages(id: string): ChatMessage[] {
     () => getState().chats.find((c) => c.id === id)?.messages ?? EMPTY,
     () => EMPTY,
   );
+}
+
+/* ---------- Бусад хуудаснаас асуулт бэлдэж өгөх (жишээ нь Сургалтын "AI-аас асуух") ---------- */
+
+const PREFILL_KEY = "tg-ask-prefill";
+
+/** Шинэ яриа нээж, асуултыг чатын талбарт бэлдэнэ. Автоматаар илгээхгүй — хэрэглэгч засаад өөрөө илгээнэ */
+export function prefillAsk(text: string) {
+  try {
+    sessionStorage.setItem(PREFILL_KEY, text);
+  } catch {
+    // Хадгалж чадахгүй бол зүгээр л хоосон чат нээгдэнэ
+  }
+  newChat();
+}
+
+/** Бэлдсэн асуултыг нэг удаа авна (дараа нь устгана) */
+export function takeAskPrefill() {
+  try {
+    const text = sessionStorage.getItem(PREFILL_KEY);
+    sessionStorage.removeItem(PREFILL_KEY);
+    return text ?? "";
+  } catch {
+    return "";
+  }
 }

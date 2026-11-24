@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   IconCalendar,
   IconCheck,
@@ -15,7 +15,6 @@ import {
   IconHeart,
   IconImage,
   IconMessage,
-  IconPencil,
   IconRefresh,
   IconSend,
   IconSliders,
@@ -53,13 +52,13 @@ import {
   Button,
   ButtonLink,
   Card,
-  CardHeader,
   inputClass,
   PageHeader,
   PlatformIcon,
   cn,
 } from "@/components/ui";
-import { addDays, formatDate, formatShortDate, TODAY } from "@/lib/format";
+import { addDays, formatDate, formatShortDate } from "@/lib/format";
+import { useToday } from "@/lib/today";
 import { errorMessage, generatePostsAI, textToImage, textToVideo } from "@/lib/ai-client";
 import { shortModel } from "@/lib/ai-models";
 import { generatePosts, generateWeekPlan, newId, visualFor, type GenerateInput, type Variant } from "@/lib/mock-ai";
@@ -68,6 +67,7 @@ import { useStore } from "@/lib/store";
 import { usePlan } from "@/lib/use-plan";
 import { useAiUsage } from "@/lib/ai-usage";
 import { planPostCount } from "@/lib/analytics";
+import { Elapsed, TOOL_TIME } from "../studio/shared";
 import {
   FORMAT_LABELS,
   LENGTH_LABELS,
@@ -81,9 +81,9 @@ import {
 } from "@/lib/types";
 
 const TOPIC_MAX = 300;
-/** Дагагчид хамгийн идэвхтэй цаг (Үр дүн → "Дагагчид хэзээ идэвхтэй вэ?") */
-const BEST_TIME = "18:00";
 const DEFAULT_TIME = "12:00";
+/** "Ухаалаг цаг" асаалттай үеийн анхдагч цаг — дагагчдын бодит статистик холбогдоогүй тул тогтмол */
+const EVENING_TIME = "18:00";
 /** Instagram-ийн caption (hashtag-тай нийлээд) ба hashtag-ийн дээд хэмжээ — засварын хэсэгт тоолно */
 const IG_CAPTION_MAX = 2200;
 const IG_HASHTAG_MAX = 30;
@@ -158,7 +158,7 @@ function ideaPool(format: PostFormat, name: string) {
       ];
 }
 
-const TIME_CHIPS = ["08:30", "12:00", BEST_TIME, "20:00"];
+const TIME_CHIPS = ["08:30", "12:00", EVENING_TIME, "20:00"];
 const DATE_CHIPS = [
   { label: "Маргааш", days: 1 },
   { label: "Нөгөөдөр", days: 2 },
@@ -171,18 +171,19 @@ export function CreateView() {
   const { business, settings, connections, connectedPlatforms, addPosts, notify, ai, posts } = useStore();
   const { plan, locked, isLoaded: planLoaded, monthlyPosts, maxPlatforms } = usePlan();
   const aiUsage = useAiUsage();
+  const today = useToday();
   // Тохиргооны "7 хоногт хэдэн пост" — багцын дээд хэмжээгээр хязгаарлана
   const perWeek = Math.min(settings.postsPerWeek, WEEKLY_POSTS[plan]);
   // Багцын сарын постын хязгаар — энэ сард өөрөө бэлдсэн пост (жишээ постууд тоологдохгүй)
-  const monthCount = planPostCount(posts);
+  const monthCount = planPostCount(posts, today);
   const postsLeft = monthlyPosts - monthCount;
   const atLimit = planLoaded && postsLeft <= 0;
 
   const [topic, setTopic] = useState("");
   const [tab, setTab] = useState<ComposerTab>("image");
   const format: PostFormat = tab === "video" ? "video" : "image";
-  /** Бэлдсэний дараа үр дүнг харуулахын тулд маягтыг хураана */
-  const [collapsed, setCollapsed] = useState(false);
+  /** Бэлдэж эхлэхэд үр дүн рүү гүйлгэнэ (Видео студи шиг) — маягт өндөр тул доор нь харагдахгүй байж болно */
+  const resultRef = useRef<HTMLDivElement>(null);
   // Хэрэглэгч өөрчлөх хүртэл холбогдсон платформууд, бизнесийн өнгө аясыг ашиглана
   const [platformsDraft, setPlatforms] = useState<Platform[] | null>(null);
   // Үнэгүй багцад нэг удаад нэг платформ
@@ -201,10 +202,12 @@ export function CreateView() {
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState("");
-  const [date, setDate] = useState(addDays(TODAY, 2));
+  // Хэрэглэгч сонгох хүртэл нөгөөдөр (бодит огноо ачаалагдмагц шинэчлэгдэнэ)
+  const [dateDraft, setDate] = useState<string | null>(null);
+  const date = dateDraft ?? addDays(today, 2);
   const [timeDraft, setTime] = useState<string | null>(null);
-  const time = timeDraft ?? (settings.smartTiming ? BEST_TIME : DEFAULT_TIME);
-  const dateError = date < TODAY ? "Өнгөрсөн огноо сонгох боломжгүй." : null;
+  const time = timeDraft ?? (settings.smartTiming ? EVENING_TIME : DEFAULT_TIME);
+  const dateError = date < today ? "Өнгөрсөн огноо сонгох боломжгүй." : null;
   const [sentTo, setSentTo] = useState<"pending" | "scheduled">("pending");
 
   const [weekLoading, setWeekLoading] = useState(false);
@@ -261,13 +264,11 @@ export function CreateView() {
     setVariants(result);
     choose(result[0]);
     setPhase("done");
-    setCollapsed(true);
   }
 
-  function startOver() {
-    reset();
-    setCollapsed(false);
-  }
+  useEffect(() => {
+    if (phase === "loading") resultRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [phase]);
 
   function shuffleIdea() {
     setTopic(pickOther(ideaPool(format, business.name || "Манай"), topic));
@@ -317,7 +318,7 @@ export function CreateView() {
     ]);
     setSentTo(status);
     setPhase("sent");
-    notify(status === "pending" ? "Батлах жагсаалтад нэмэгдлээ" : `Хуваарьт орлоо: ${formatDate(date)} ${time}`);
+    notify(status === "pending" ? "Батлах жагсаалтад нэмэгдлээ" : `Хуваарьт орлоо: ${formatDate(date, today)} ${time}`);
   }
 
   function reset() {
@@ -418,42 +419,12 @@ export function CreateView() {
       <Card className="p-4 sm:p-6">
         {/* Таб: юу бэлдэх вэ */}
         <div className="flex flex-wrap items-center gap-2">
-          <StartOverButton onClick={startOver} />
-          <ComposerTabs
-            label="Юу бэлдэх вэ"
-            tabs={TABS}
-            value={tab}
-            onChange={(v) => {
-              setTab(v);
-              setCollapsed(false);
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? "Маягтыг дэлгэх" : "Маягтыг хураах"}
-            className="ml-auto flex size-10 cursor-pointer items-center justify-center rounded-full text-zinc-500 ring-1 ring-zinc-900/10 transition-colors hover:bg-zinc-900/[0.04] hover:text-zinc-900"
-          >
-            <IconChevronDown className={cn("size-5 transition-transform", !collapsed && "rotate-180")} />
-          </button>
+          <StartOverButton onClick={reset} />
+          <ComposerTabs label="Юу бэлдэх вэ" tabs={TABS} value={tab} onChange={setTab} />
         </div>
         <p className="mt-3 text-sm text-zinc-500">{TABS.find((t) => t.value === tab)!.subtitle}</p>
 
-        {collapsed ? (
-          <button
-            type="button"
-            onClick={() => setCollapsed(false)}
-            className="mt-4 flex w-full cursor-pointer items-center gap-3 rounded-xl bg-zinc-900/[0.03] px-4 py-3 text-left text-sm ring-1 ring-inset ring-zinc-900/[0.05] transition-colors hover:bg-zinc-900/[0.05]"
-          >
-            <IconPencil className="size-4 shrink-0 text-zinc-400" />
-            <span className="min-w-0 flex-1 truncate text-zinc-700">{topic.trim() ? `“${topic.trim()}”` : "Сэдэв бичээгүй"}</span>
-            <span className="hidden shrink-0 text-xs text-zinc-400 sm:inline">
-              {TONE_LABELS[tone]} · {platforms.map((p) => PLATFORM_LABELS[p]).join(", ") || "Платформ сонгоогүй"}
-            </span>
-            <span className="shrink-0 text-xs font-medium text-brand-700">Засах</span>
-          </button>
-        ) : tab === "week" ? (
+        {tab === "week" ? (
           /* ---------- 7 хоногийн төлөвлөгөө ---------- */
           <div className="mt-5 flex flex-col gap-5 rounded-2xl bg-zinc-900/[0.03] p-5 ring-1 ring-inset ring-zinc-900/[0.05] sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-xl">
@@ -629,6 +600,11 @@ export function CreateView() {
                     )}
                   </p>
                   <AiStatusLine task="text" mock="жишээ текстээр (0 токен)" fallback="жишээ текстээр" />
+                  {aiUsage !== "mock" && (
+                    <p className="flex items-center gap-1.5 text-xs text-zinc-400">
+                      <IconClock className="size-3.5 shrink-0" /> Ихэвчлэн {TOOL_TIME.text} үргэлжилнэ
+                    </p>
+                  )}
                 </>
               }
             >
@@ -660,19 +636,17 @@ export function CreateView() {
       </Card>
 
       {/* ---------- Үр дүн ---------- */}
-      <div className="mt-6">
+      <div ref={resultRef} className="mt-6 scroll-mt-6">
           {phase === "loading" && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {[0, 1, 2].map((i) => (
-                <Card key={i} className="animate-pulse p-4">
-                  <div className="h-5 w-24 rounded-full bg-zinc-100" />
-                  <div className="mt-4 h-3 w-3/4 rounded bg-zinc-100" />
-                  <div className="mt-2 h-3 w-full rounded bg-zinc-100" />
-                  <div className="mt-2 h-3 w-2/3 rounded bg-zinc-100" />
-                  <div className="mt-2 h-3 w-5/6 rounded bg-zinc-100" />
-                </Card>
-              ))}
-            </div>
+            <Card className="flex min-h-[280px] flex-col items-center justify-center p-8 text-center">
+              <span className="size-10 animate-spin rounded-full border-[3px] border-violet-100 border-t-violet-600" />
+              <p className="mt-4 font-medium text-zinc-900">
+                {format === "video" ? "AI 3 Reel санаа бэлдэж байна…" : "AI 3 хувилбар бэлдэж байна…"}
+              </p>
+              <p className="mt-1 text-sm text-zinc-500">
+                Ихэвчлэн {TOOL_TIME.text} үргэлжилнэ · <Elapsed />
+              </p>
+            </Card>
           )}
 
           {phase === "sent" && (
@@ -686,7 +660,7 @@ export function CreateView() {
               <p className="mt-1 max-w-sm text-sm text-zinc-500">
                 {sentTo === "pending"
                   ? "Батласны дараа хуваарийн дагуу автоматаар нийтлэгдэнэ."
-                  : `${formatDate(date)}, ${time} цагт автоматаар нийтлэгдэнэ.`}
+                  : `${formatDate(date, today)}, ${time} цагт автоматаар нийтлэгдэнэ.`}
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-2">
                 <ButtonLink
@@ -703,13 +677,12 @@ export function CreateView() {
           )}
 
           {phase === "done" && variant && visual && (
-            <div className="space-y-6">
-              <div>
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-                    <StepNumber n={2} active />
-                    Таалагдсан хувилбараа сонгоно уу
-                  </p>
+            <Card>
+              {/* Видео студийн үр дүн шиг: "Бэлэн боллоо" мөр → хувилбарууд → засах + урьдчилан харах */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 px-5 py-3">
+                <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">
+                  <IconCheckCircle className="size-4 text-emerald-600" /> Бэлэн боллоо
+                </p>
                   <div className="flex flex-wrap gap-1.5">
                     {isVideo && (
                       <Badge tone="sky">
@@ -726,8 +699,14 @@ export function CreateView() {
                       </Badge>
                     )}
                   </div>
-                </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              </div>
+
+              <div className="p-5">
+                <p className="font-medium text-zinc-900">Таалагдсан хувилбараа сонгоно уу</p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  {variants.length} хувилбар · {FORMAT_LABELS[genFormat]} · сонгосноо доор засна
+                </p>
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                   {variants.map((v, i) => (
                     <button
                       key={v.id}
@@ -762,18 +741,15 @@ export function CreateView() {
                 </div>
               </div>
 
-              <Card>
-                <CardHeader
-                  title={
-                    <span className="flex items-center gap-2">
-                      <StepNumber n={3} active />
-                      Засаад, {isVideo ? "видео" : "зураг"} нэмээд, хуваарьт оруулах
-                    </span>
-                  }
-                  description="Бүгдийг шууд засаж болно. Баруун талд хэрэглэгчид яг ингэж харагдана."
-                />
-                <div className="grid grid-cols-1 gap-6 p-5 xl:grid-cols-[1fr_300px]">
-                  <div className="min-w-0 space-y-6">
+                <div className="grid grid-cols-1 gap-6 border-t border-zinc-100 p-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+                  <div className="min-w-0 space-y-6 xl:order-last">
+                    <div>
+                      <p className="font-medium text-zinc-900">Засаад, {isVideo ? "видео" : "зураг"} нэмээд, хуваарьт оруулах</p>
+                      <p className="mt-1 text-sm text-zinc-500">
+                        Бүгдийг шууд засаж болно. Урьдчилан харах хэсэгт хэрэглэгчид яг ингэж харагдана.
+                      </p>
+                    </div>
+
                     {/* Текст */}
                     <Section title="Текст">
                       <textarea
@@ -950,7 +926,7 @@ export function CreateView() {
                             id="date"
                             type="date"
                             aria-label="Огноо"
-                            min={TODAY}
+                            min={today}
                             value={date}
                             onChange={(e) => setDate(e.target.value)}
                             aria-invalid={dateError ? true : undefined}
@@ -958,7 +934,7 @@ export function CreateView() {
                           />
                           <div className="flex flex-wrap gap-1.5">
                             {DATE_CHIPS.map((c) => {
-                              const value = addDays(TODAY, c.days);
+                              const value = addDays(today, c.days);
                               return (
                                 <Chip key={c.label} active={date === value} onClick={() => setDate(value)} title={formatShortDate(value)}>
                                   {c.label}
@@ -979,19 +955,13 @@ export function CreateView() {
                           />
                           <div className="flex flex-wrap gap-1.5">
                             {TIME_CHIPS.map((t) => (
-                              <Chip
-                                key={t}
-                                active={time === t}
-                                onClick={() => setTime(t)}
-                                title={t === BEST_TIME ? "Дагагчид хамгийн идэвхтэй цаг" : undefined}
-                              >
-                                {t === BEST_TIME ? `★ ${t}` : t}
+                              <Chip key={t} active={time === t} onClick={() => setTime(t)}>
+                                {t}
                               </Chip>
                             ))}
                           </div>
                         </div>
                       </div>
-                      <p className="mt-2 text-xs text-zinc-400">★ {BEST_TIME} — таны дагагчид хамгийн идэвхтэй цаг (жишээ өгөгдөл).</p>
                     </Section>
 
                     <div className="space-y-2.5 border-t border-dashed border-zinc-900/15 pt-5">
@@ -1017,8 +987,8 @@ export function CreateView() {
                     </div>
                   </div>
 
-                  <div className="w-full max-w-sm xl:sticky xl:top-6 xl:self-start">
-                    <p className="mb-2 text-[13px] font-medium text-zinc-700">Урьдчилан харах</p>
+                  <div className="mx-auto w-full max-w-sm xl:sticky xl:top-6 xl:order-first xl:mx-0 xl:max-w-none xl:self-start">
+                    <p className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.12em] text-zinc-500">Урьдчилан харах</p>
                     <PostPreview
                       caption={caption}
                       hashtags={hashtags}
@@ -1029,8 +999,7 @@ export function CreateView() {
                     />
                   </div>
                 </div>
-              </Card>
-            </div>
+            </Card>
           )}
       </div>
     </>
@@ -1042,7 +1011,7 @@ function Section({ title, aside, children }: { title: string; aside?: ReactNode;
   return (
     <section>
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h3 className="text-[13px] font-medium text-zinc-700">{title}</h3>
+        <h3 className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-zinc-500">{title}</h3>
         {aside && <div className="text-xs text-zinc-400">{aside}</div>}
       </div>
       {children}
@@ -1080,17 +1049,3 @@ function Chip({
   );
 }
 
-/** Алхмын дугаар — хэрэглэгч аль шатандаа явааг харуулна */
-function StepNumber({ n, active, done }: { n: number; active?: boolean; done?: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-        done ? "bg-emerald-500 text-white" : active ? "bg-ink text-lime" : "bg-zinc-100 text-zinc-500",
-      )}
-    >
-      {done ? <IconCheck className="size-3.5" /> : n}
-    </span>
-  );
-}

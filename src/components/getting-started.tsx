@@ -1,13 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { INITIAL_POSTS } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
 import { IconArrowRight, IconCheck, IconRocket, IconX } from "./icons";
 import { ButtonLink, Card, cn } from "./ui";
 
-const INITIAL_IDS = new Set(INITIAL_POSTS.map((p) => p.id));
-const INITIAL_PENDING = new Set(INITIAL_POSTS.filter((p) => p.status === "pending").map((p) => p.id));
 
 /**
  * Шинэ хэрэглэгчийг "юунаас эхлэх вэ?" гэдэгт хөтөлнө.
@@ -39,7 +36,7 @@ export function GettingStarted() {
       description: "Юуны тухай пост хийхээ нэг өгүүлбэрээр бичихэд AI 3 өөр хувилбар санал болгоно.",
       href: "/dashboard/create",
       cta: "Пост бэлдэх",
-      done: posts.some((p) => !INITIAL_IDS.has(p.id)),
+      done: posts.length > 0,
     },
     {
       id: "approve",
@@ -47,15 +44,15 @@ export function GettingStarted() {
       description: "Таны батласан пост л нийтлэгдэнэ. Хүссэнээрээ засаж, цагийг нь сольж болно.",
       href: "/dashboard#pending",
       cta: "Батлах руу очих",
-      done: posts.some((p) => p.status === "scheduled" && (INITIAL_PENDING.has(p.id) || !INITIAL_IDS.has(p.id))),
+      done: posts.some((p) => p.status === "scheduled" || p.status === "published"),
     },
     {
       id: "learn",
-      title: "Эхлэгчийн зааврыг унших",
-      description: "Хүрэлт, идэвх, boost гэж юу болохыг 3 минутад ойлгоно.",
+      title: "Сургалтаас эхний хичээлээ үзэх",
+      description: "Маркетинг, boost, татварын үндсийг алхам алхмаар, жишээтэй сурна.",
       href: "/dashboard/guides",
-      cta: "Заавар унших",
-      done: readGuides.length > 1,
+      cta: "Сургалт эхлэх",
+      done: readGuides.length > 0,
     },
   ];
 

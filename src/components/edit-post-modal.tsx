@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TODAY } from "@/lib/format";
+import { useToday } from "@/lib/today";
 import { useStore } from "@/lib/store";
 import type { Platform, Post } from "@/lib/types";
 import { Modal } from "./modal";
@@ -24,6 +24,7 @@ export function EditPostModal({
   const [caption, setCaption] = useState(post.caption);
   const [tags, setTags] = useState(post.hashtags.join(" "));
   const [date, setDate] = useState(post.date);
+  const today = useToday();
   const [time, setTime] = useState(post.time);
   const [platforms, setPlatforms] = useState<Platform[]>(post.platforms);
 
@@ -34,7 +35,7 @@ export function EditPostModal({
 
   // Салгагдсан платформ руу нийтлэх боломжгүй
   const activePlatforms = platforms.filter((p) => connections[p]);
-  const dateError = date < TODAY ? "Өнгөрсөн огноо сонгох боломжгүй." : !date ? "Огноо сонгоно уу." : null;
+  const dateError = date < today ? "Өнгөрсөн огноо сонгох боломжгүй." : !date ? "Огноо сонгоно уу." : null;
   const canSave = caption.trim().length > 0 && activePlatforms.length > 0 && !dateError && !!time;
 
   function togglePlatform(p: Platform) {
@@ -91,7 +92,7 @@ export function EditPostModal({
               <input
                 id="edit-date"
                 type="date"
-                min={TODAY}
+                min={today}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 aria-invalid={dateError ? true : undefined}
